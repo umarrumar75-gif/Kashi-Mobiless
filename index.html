@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0b0e">
+<title>KASHI MOBILE</title>
+<script src="https://cdn.tailwindcss.com">
+/* Premium interaction effects: click ripple and entrance refresh */
+document.addEventListener('click', function(ev){
+  const btn=ev.target.closest('button'); if(!btn || btn.disabled) return;
+  const rect=btn.getBoundingClientRect();
+  const ripple=document.createElement('span'); ripple.className='rippleFX';
+  const size=Math.max(rect.width,rect.height)*1.15;
+  ripple.style.width=ripple.style.height=size+'px';
+  ripple.style.left=(ev.clientX-rect.left-size/2)+'px';
+  ripple.style.top=(ev.clientY-rect.top-size/2)+'px';
+  btn.appendChild(ripple); setTimeout(()=>ripple.remove(),600);
+}, {passive:true});
+const motionObserver=new MutationObserver(records=>{
+  for(const rec of records){
+    if(rec.type==='attributes' && rec.attributeName==='class'){
+      const el=rec.target;
+      if(el.classList && !el.classList.contains('hidden') && (el.classList.contains('overlay') || el.id==='mainScreen')){
+        el.style.animation='none'; void el.offsetWidth; el.style.animation='';
+      }
+    }
+  }
+});
+['formScreen','detailScreen','reportScreen','settingsScreen','mainScreen'].forEach(id=>{const el=document.getElementById(id);if(el)motionObserver.observe(el,{attributes:true,attributeFilter:['class']});});
+
+</script>
+<style>
+*{box-sizing:border-box}
+html{color-scheme:dark}
+html,body{background:#09090d;color:#f5f3ff;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-tap-highlight-color:transparent;scroll-behavior:smooth}
+body{margin:0}
+.app{max-width:460px;min-height:100svh;margin:auto;background:radial-gradient(ellipse at 90% 0%,#28153f 0%,#111015 34%,#09090d 75%);position:relative;padding:calc(20px + env(safe-area-inset-top,0px)) 16px 110px;overflow:hidden}
+.app:before{content:"";position:absolute;top:0;left:0;right:0;height:180px;background:linear-gradient(140deg,rgba(139,92,246,.12),transparent 65%);pointer-events:none}
+.glass{background:linear-gradient(145deg,rgba(36,32,45,.86),rgba(17,16,21,.94));border:1px solid rgba(180,155,255,.18);box-shadow:0 12px 28px rgba(0,0,0,.22),inset 0 1px rgba(255,255,255,.035);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
+.stat{border-radius:19px;padding:13px 12px;animation:rise .4s ease both}
+.repair{border-radius:21px;padding:12px;display:flex;gap:12px;animation:rise .4s ease both;transition:transform .15s;cursor:pointer}
+.repair:active{transform:scale(.985)}
+.chip{border:1px solid #393345;background:#17151c;color:#bdb5ce;border-radius:999px;padding:8px 13px;font-size:11px;font-weight:700;white-space:nowrap;transition:all .2s ease}
+.chip.on{border-color:#8b5cf6;background:linear-gradient(120deg,#8b5cf6,#6427bd);color:#fff;box-shadow:0 5px 15px #8b5cf640}
+.inp{width:100%;border:1px solid #393345;background:#17151c;color:#f5f3ff;border-radius:15px;padding:13px 14px;font-size:14px;outline:none;transition:border .2s,box-shadow .2s}
+.inp::placeholder{color:#6f6a7c}
+.inp:focus{border-color:#a78bfa;box-shadow:0 0 0 3px #a78bfa18}
+.lbl{font-size:12px;font-weight:700;color:#bdb5ce;margin:16px 0 7px;display:block;letter-spacing:.2px}
+.btn{border-radius:15px;padding:13px 16px;font-weight:700;font-size:14px;transition:transform .18s ease,box-shadow .18s ease,opacity .18s}
+.btn:active{transform:scale(.96)}
+.vbtn{background:linear-gradient(110deg,#8b5cf6,#7044d4);color:#fff;box-shadow:0 8px 24px #7c3aed30}
+.vbtn:disabled{opacity:.6}
+.badge{font-size:10px;font-weight:700;border-radius:999px;padding:4px 8px;border:1px solid transparent}
+.st-Pending{background:rgba(245,158,11,.15);color:#fbbf24;border-color:rgba(251,191,36,.2)}
+.st-Ready{background:rgba(16,185,129,.15);color:#34d399;border-color:rgba(52,211,153,.2)}
+.st-Diya{background:rgba(168,85,247,.15);color:#c4b5fd;border-color:rgba(167,139,250,.2)}
+.overlay{position:fixed;inset:0;background:radial-gradient(ellipse at 90% 0%,#28153f 0%,#111015 34%,#09090d 75%) #09090d;overflow-y:auto;z-index:30;overscroll-behavior:contain}
+.overlay>div{max-width:460px;margin:0 auto;min-height:100%}
+.hidden{display:none!important}
+.topbar{padding-top:env(safe-area-inset-top,0px)}
+.hdr{background:rgba(12,11,16,.9);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
+#formScreen>div,#detailScreen>div,#reportScreen>div,#settingsScreen>div{animation:slideIn .3s cubic-bezier(.22,1,.36,1)}
+#tabs{scrollbar-width:none}
+#tabs::-webkit-scrollbar{display:none}
+#toast{animation:toastIn .25s ease}
+button{cursor:pointer}
+@keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+@keyframes slideIn{from{opacity:0;transform:translateX(24px)}to{opacity:1;transform:translateX(0)}}
+@keyframes toastIn{from{opacity:0;transform:translate(-50%,10px)}to{opacity:1;transform:translate(-50%,0)}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+
+/* ===== LOGIN PAGE (user design, scoped to #loginScreen) ===== */
+#loginScreen{min-height:100svh;overflow:hidden;position:relative;color:#f7f5ff;background:radial-gradient(ellipse at 50% 10%,#302344 0%,#141318 36%,#0b0b0e 74%);padding:24px 18px calc(20px + env(safe-area-inset-bottom))}
+#loginScreen:before{content:"";position:absolute;inset:0;background:linear-gradient(130deg,rgba(255,255,255,.035),transparent 40%,rgba(155,122,255,.04));pointer-events:none}
+#loginScreen .lwrap{width:100%;max-width:440px;margin:0 auto;position:relative;z-index:1}
+#loginScreen .brand{display:flex;align-items:center;justify-content:center;gap:10px;margin-top:6px}
+#loginScreen .brandicon{width:42px;height:42px;border-radius:14px;background:linear-gradient(145deg,#242229,#111114);border:1px solid #46414f;box-shadow:0 6px 20px #0008;display:grid;place-items:center;font-size:23px;font-weight:900;color:#b9a2ff}
+#loginScreen .brandname{font-size:20px;font-weight:800;letter-spacing:-.5px}
+#loginScreen .brandname span{color:#a78bfa}
+#loginScreen .tagline{text-align:center;color:#aaa5b7;font-size:12px;margin-top:5px;letter-spacing:.15px}
+#loginScreen .hero{height:230px;display:flex;align-items:center;justify-content:center;position:relative;margin:10px 0 0}
+#loginScreen .glow{position:absolute;width:260px;height:210px;border-radius:50%;background:radial-gradient(ellipse,#8b5cf680 0%,#6d28d950 28%,transparent 72%);filter:blur(20px)}
+#loginScreen .orbit{position:absolute;width:280px;height:105px;border:1px solid rgba(180,155,255,.3);border-radius:50%;transform:rotate(-18deg);box-shadow:0 0 22px #9b7aff18}
+#loginScreen .phone{width:128px;height:220px;border-radius:28px;background:linear-gradient(135deg,#45414e,#0d0d11 30%,#25212c 70%,#77717e);padding:5px;position:relative;transform:rotate(-8deg);box-shadow:0 28px 45px #0009,0 0 30px #a78bfa25;z-index:2}
+#loginScreen .phone:before{content:"";position:absolute;right:-3px;top:54px;width:3px;height:32px;border-radius:3px;background:#aaa}
+#loginScreen .screen{height:100%;border-radius:24px;overflow:hidden;position:relative;background:linear-gradient(160deg,#17131e,#09090d 62%,#281642);border:1px solid #756a84}
+#loginScreen .screen:before{content:"";position:absolute;width:95px;height:150px;border-radius:50%;background:radial-gradient(circle,#a78bfa80,transparent 70%);top:35px;right:-35px;filter:blur(12px)}
+#loginScreen .screen:after{content:"";position:absolute;left:-25px;bottom:-45px;width:140px;height:130px;border-radius:50%;background:radial-gradient(circle,#7c3aed80,transparent 70%);filter:blur(10px)}
+#loginScreen .notch{width:48px;height:12px;border-radius:0 0 10px 10px;background:#07070a;position:absolute;top:0;left:50%;transform:translateX(-50%);z-index:3}
+#loginScreen .phonecontent{position:absolute;inset:25px 9px 12px;text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:1}
+#loginScreen .phonek{font-size:30px;font-weight:900;color:#b9a2ff;text-shadow:0 0 18px #9b7aff70}
+#loginScreen .phonelabel{font-size:8px;letter-spacing:2px;color:#d9d2eb;margin-top:4px}
+#loginScreen .phonecaption{position:absolute;bottom:18px;font-size:8px;color:#a7a0b5;letter-spacing:1px}
+#loginScreen .phoneglint{position:absolute;top:35px;left:10px;width:2px;height:60px;background:linear-gradient(transparent,#ddd,transparent);opacity:.3}
+#loginScreen .lcard{border:1px solid rgba(255,255,255,.11);background:linear-gradient(145deg,rgba(36,34,43,.94),rgba(19,18,23,.97));border-radius:25px;padding:24px 20px;box-shadow:0 18px 50px #0005, inset 0 1px rgba(255,255,255,.04);-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);animation:lenter .45s ease both}
+#loginScreen h1{font-size:23px;font-weight:800;letter-spacing:-.6px;text-align:center;margin:0}
+#loginScreen .subtitle{text-align:center;color:#a8a3b2;font-size:12px;margin-top:5px}
+#loginScreen .btn{width:100%;border-radius:14px;padding:13px 14px;font-size:14px;font-weight:700;transition:transform .15s,background .2s}
+#loginScreen .btn:active{transform:scale(.98)}
+#loginScreen .btn:disabled{opacity:.65}
+#loginScreen .google{background:#f8f7fb;color:#19171e;border:1px solid #e8e5ef}
+#loginScreen .primary{background:linear-gradient(110deg,#8b5cf6,#7044d4);color:white;box-shadow:0 8px 24px #7c3aed30}
+#loginScreen .label{display:block;font-size:12px;font-weight:700;color:#c9c4d3;margin:16px 0 7px}
+#loginScreen .inp{width:100%;background:#131218;border:1px solid #37333f;color:#f6f3ff;border-radius:13px;padding:13px 14px;font-size:14px;outline:none;transition:.2s}
+#loginScreen .inp::placeholder{color:#777282}
+#loginScreen .inp:focus{border-color:#a78bfa;box-shadow:0 0 0 3px #a78bfa18}
+#loginScreen .message{min-height:20px;text-align:center;font-size:12px;margin-top:12px}
+#loginScreen .footer{text-align:center;color:#777282;font-size:10px;margin-top:20px;letter-spacing:.2px}
+@keyframes lenter{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+@media(min-height:850px){#loginScreen .hero{height:260px}#loginScreen .phone{transform:rotate(-8deg) scale(1.05)}#loginScreen .lcard{padding:26px 22px}}
+@media(max-height:730px){#loginScreen .hero{height:190px;margin-top:0}#loginScreen .phone{transform:rotate(-8deg) scale(.86)}#loginScreen .lcard{padding:20px}#loginScreen{padding-top:14px}}
+
+/* ===== PREMIUM MOTION LAYER ===== */
+:root{--pGlow:rgba(167,139,250,.42);--pEdge:rgba(196,181,253,.22)}
+button,.chip,.repair,.glass,.inp{will-change:transform,box-shadow}
+button:not(:disabled){position:relative;overflow:hidden;transition:transform .22s cubic-bezier(.2,.8,.2,1),box-shadow .25s,border-color .25s,filter .25s}
+button:not(:disabled):hover{filter:brightness(1.08)}
+button:not(:disabled):active{transform:scale(.965);filter:brightness(1.15)}
+.btn,.chip{isolation:isolate}
+.btn:before, #addBtn:before{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(110deg,transparent 20%,rgba(255,255,255,.18),transparent 65%);transform:translateX(-130%);transition:transform .65s ease}
+.btn:hover:before,#addBtn:hover:before{transform:translateX(130%)}
+.vbtn,.primary,#addBtn{box-shadow:0 8px 26px rgba(124,58,237,.22),inset 0 1px rgba(255,255,255,.15)}
+.vbtn:hover,.primary:hover,#addBtn:hover{box-shadow:0 10px 32px rgba(139,92,246,.4),0 0 0 1px rgba(196,181,253,.2)}
+.glass{transition:border-color .28s,box-shadow .28s,transform .28s}
+.glass:hover{border-color:rgba(196,181,253,.28);box-shadow:0 16px 34px rgba(0,0,0,.28),0 0 20px rgba(139,92,246,.06),inset 0 1px rgba(255,255,255,.05)}
+.repair:hover{transform:translateY(-2px);border-color:rgba(196,181,253,.32);box-shadow:0 16px 35px rgba(0,0,0,.3),0 0 22px rgba(139,92,246,.08)}
+.chip.on{transform:translateY(-1px)}
+.inp:focus,textarea.inp:focus{transform:translateY(-1px);box-shadow:0 0 0 3px rgba(167,139,250,.12),0 8px 24px rgba(124,58,237,.08)}
+#loginScreen .phone{animation:phoneFloat 5s ease-in-out infinite}
+#loginScreen .orbit{animation:orbitGlow 6s ease-in-out infinite alternate}
+#loginScreen .glow{animation:glowPulse 4s ease-in-out infinite alternate}
+#loginScreen .brandicon{animation:brandPulse 4s ease-in-out infinite}
+#mainScreen:not(.hidden){animation:screenReveal .42s cubic-bezier(.22,1,.36,1) both}
+.overlay:not(.hidden)>div{animation:overlayReveal .36s cubic-bezier(.22,1,.36,1) both}
+#list .repair:nth-child(1){animation-delay:30ms}#list .repair:nth-child(2){animation-delay:65ms}#list .repair:nth-child(3){animation-delay:100ms}#list .repair:nth-child(4){animation-delay:135ms}#list .repair:nth-child(5){animation-delay:170ms}#list .repair:nth-child(n+6){animation-delay:200ms}
+.stat{transition:transform .3s,box-shadow .3s}
+.stat:hover{transform:translateY(-3px)}
+#addBtn{animation:addPulse 3.4s ease-in-out infinite}
+#toast:not(.hidden){box-shadow:0 12px 32px rgba(0,0,0,.45),0 0 22px rgba(139,92,246,.15);animation:toastIn .28s cubic-bezier(.22,1,.36,1)}
+.rippleFX{position:absolute;border-radius:50%;pointer-events:none;background:rgba(255,255,255,.32);transform:scale(0);animation:rippleFX .55s ease-out forwards;z-index:4}
+@keyframes rippleFX{to{transform:scale(1);opacity:0}}
+@keyframes phoneFloat{0%,100%{translate:0 0}50%{translate:0 -9px}}
+@keyframes orbitGlow{from{opacity:.45;box-shadow:0 0 12px #9b7aff12}to{opacity:.9;box-shadow:0 0 30px #9b7aff35}}
+@keyframes glowPulse{from{opacity:.65;scale:.92}to{opacity:1;scale:1.08}}
+@keyframes brandPulse{0%,100%{box-shadow:0 6px 20px #0008}50%{box-shadow:0 6px 25px #8b5cf640}}
+@keyframes addPulse{0%,100%{box-shadow:0 8px 25px #5b21b940}50%{box-shadow:0 8px 32px #8b5cf680,0 0 0 7px #8b5cf610}}
+@keyframes screenReveal{from{opacity:0;filter:blur(3px);transform:translateY(8px)}to{opacity:1;filter:blur(0);transform:translateY(0)}}
+@keyframes overlayReveal{from{opacity:0;transform:translateX(20px) scale(.99)}to{opacity:1;transform:translateX(0) scale(1)}}
+@media(prefers-reduced-motion:reduce){#loginScreen .phone,#loginScreen .orbit,#loginScreen .glow,#loginScreen .brandicon,#addBtn{animation:none!important}}
+
+</style>
+<style id="kashi-next-level">
+:root{--gold:#e6c98b;--purple:#a78bfa;--surface:rgba(22,19,29,.78)}
+body{background:#07070a!important}
+.app{background:radial-gradient(ellipse at 12% -10%,#38204f 0%,#15111c 28%,#08080b 76%)!important;box-shadow:0 0 90px #0008,inset 0 0 0 1px #ffffff06}
+.app:after{content:"";position:fixed;pointer-events:none;inset:0;z-index:0;opacity:.13;background-image:radial-gradient(#fff 0.55px,transparent .55px);background-size:18px 18px;mask-image:linear-gradient(to bottom,#000,transparent 75%)}
+#mainScreen header .w-11{background:linear-gradient(135deg,#e4c98e,#7d5cba 52%,#211632)!important;border:1px solid #f0d9a880!important;box-shadow:0 0 24px #b58bff30,0 8px 20px #0007!important;color:#fff!important}
+#mainScreen header{padding:8px 0 14px;border-bottom:1px solid #ffffff0a}
+#mainScreen header .font-extrabold{letter-spacing:-.6px}
+#mainScreen>section:first-of-type{background:linear-gradient(135deg,#322340e8,#1a1621e8 55%,#111014e8)!important;border:1px solid #d7b77935!important;box-shadow:0 20px 40px #0005,inset 0 1px #ffffff12!important;position:relative;overflow:hidden}
+#mainScreen>section:first-of-type:after{content:"";position:absolute;right:-60px;top:-80px;width:190px;height:190px;border-radius:50%;background:radial-gradient(circle,#b995e535,transparent 70%);pointer-events:none}
+.stat{background:linear-gradient(145deg,#272131cc,#15131acc)!important;border-color:#ffffff12!important;box-shadow:0 12px 26px #0003,inset 0 1px #ffffff09!important;border-radius:21px!important;padding:15px 13px!important}
+.stat>div:nth-child(2){font-size:25px!important;letter-spacing:-.8px}
+.inp{background:linear-gradient(145deg,#17141d,#0f0e13)!important;border:1px solid #ffffff12!important;border-radius:17px!important;box-shadow:inset 0 1px #ffffff08!important;padding-top:14px!important;padding-bottom:14px!important}
+.inp:focus{border-color:#b89af4!important;box-shadow:0 0 0 3px #a78bfa18,0 0 22px #a78bfa13!important;transform:translateY(-1px)}
+.chip{background:#17141c!important;border-color:#ffffff10!important;color:#a9a1b8!important;border-radius:14px!important;padding:9px 14px!important}
+.chip.on{background:linear-gradient(135deg,#bda16c,#8763c8)!important;border-color:#e8d2a766!important;color:#fff!important;box-shadow:0 7px 22px #b38aef25!important}
+.repair{background:linear-gradient(145deg,#262130ee,#151319f5)!important;border:1px solid #ffffff10!important;border-radius:22px!important;box-shadow:0 14px 30px #0003,inset 0 1px #ffffff07!important;transition:transform .25s,border-color .25s,box-shadow .25s!important}
+.repair:hover{transform:translateY(-3px)!important;border-color:#bba2f333!important;box-shadow:0 18px 34px #0005,0 0 20px #9b7aff0a!important}
+#listTitle{letter-spacing:-.45px}
+nav.fixed{background:linear-gradient(180deg,#191521e9,#0d0b10f7)!important;border-color:#d4b67825!important;box-shadow:0 -12px 34px #0005!important;backdrop-filter:blur(22px)!important;-webkit-backdrop-filter:blur(22px)!important}
+nav.fixed button:not(#addBtn){min-width:48px;transition:color .2s,transform .2s;opacity:.78}
+nav.fixed button:not(#addBtn):hover,nav.fixed button:not(#addBtn):active{opacity:1;transform:translateY(-2px);color:#e5c88b!important}
+#addBtn{border:1px solid #f3dfad70!important;background:linear-gradient(145deg,#d4b576,#8e64d0 70%,#44256c)!important;box-shadow:0 0 0 6px #a78bfa0a,0 12px 30px #8b5cf650!important;color:white!important}
+#toast{background:linear-gradient(135deg,#30243c,#16121d)!important;border-color:#d6b87950!important;box-shadow:0 12px 32px #0007,0 0 25px #a78bfa15!important}
+.overlay{background:radial-gradient(ellipse at 20% 0%,#352144 0%,#141119 35%,#07070a 80%)!important}
+.overlay .hdr{background:#100e15e8!important;border-bottom:1px solid #ffffff0a!important}
+.overlay .glass{border-color:#ffffff12!important}
+button{letter-spacing:.05px}
+.btn.vbtn,.btn.primary{background:linear-gradient(120deg,#c0a06b,#9a77da 58%,#6e45b6)!important;box-shadow:0 10px 25px #9972cf28!important;border:1px solid #f1d8a520!important}
+.btn.vbtn:hover,.btn.primary:hover{box-shadow:0 12px 30px #b38aef40!important}
+#loginScreen{background:radial-gradient(ellipse at 50% 0%,#39244e 0%,#16121c 42%,#07070a 82%)!important}
+#loginScreen .lcard{background:linear-gradient(145deg,#292332ee,#131116f5)!important;border-color:#d6b87925!important;box-shadow:0 24px 65px #0008,inset 0 1px #ffffff10!important}
+#loginScreen .brandicon{border-color:#d7b77955!important;background:linear-gradient(135deg,#d5b879,#8b66c6)!important;color:#fff!important;box-shadow:0 0 25px #b58bff25!important}
+#loginScreen .phone{box-shadow:0 30px 55px #000b,0 0 35px #a78bfa2a!important}
+#loginScreen .glow{background:radial-gradient(ellipse,#d0a66d65 0%,#6d28d950 32%,transparent 72%)!important}
+#loginScreen .orbit{border-color:#e1c48740!important}
+#loginScreen .primary{background:linear-gradient(120deg,#c0a06b,#9a77da 58%,#6e45b6)!important}
+@media(max-width:380px){.app{padding-left:12px!important;padding-right:12px!important}.stat{padding:12px 10px!important}.stat>div:nth-child(2){font-size:22px!important}.repair{gap:9px!important}}
+@media(prefers-reduced-motion:reduce){#mainScreen>section:first-of-type:after{animation:none}}
+</style>
+
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="loginScreen" class="hidden">
+<main class="lwrap">
+<header>
+<div class="brand"><div class="brandicon">K</div><div class="brandname">Kashi <span>Mobile</span></div></div>
+<p class="tagline">Repair · Manage · Grow</p>
+</header>
+<section class="hero" aria-label="Decorative smartphone">
+<div class="glow"></div><div class="orbit"></div>
+<div class="phone"><div class="screen"><div class="notch"></div><div class="phoneglint"></div><div class="phonecontent"><div class="phonek">K</div><div class="phonelabel">KASHI MOBILE</div></div><div class="phonecaption">REPAIR • MANAGE</div></div></div>
+</section>
+<section class="lcard">
+<h1>Welcome Back</h1><p class="subtitle">Sign in to your Kashi Mobile account</p>
+<button id="googleBtn" class="btn google mt-5 flex items-center justify-center gap-3"><svg width="18" height="18" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3A12 12 0 1 1 24 12a11.8 11.8 0 0 1 7.8 2.9l5.7-5.7A20 20 0 1 0 44 24c0-1.2-.1-2.3-.4-3.5z"/><path fill="#FF3D00" d="m6.3 14.7 6.6 4.8A12 12 0 0 1 24 12c3 0 5.7 1.1 7.8 2.9l5.7-5.7A20 20 0 0 0 6.3 14.7z"/><path fill="#4CAF50" d="M24 44a20 20 0 0 0 13.5-5.2l-6.2-5.2A12 12 0 0 1 12.9 28l-6.5 5A20 20 0 0 0 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3a12 12 0 0 1-4 5.6l6.2 5.2A20 20 0 0 0 44 24c0-1.2-.1-2.3-.4-3.5z"/></svg>Continue with Google</button>
+<div class="flex items-center gap-3 my-5"><div class="h-px bg-white/10 flex-1"></div><span class="text-[11px] text-[#827b90]">OR CONTINUE WITH EMAIL</span><div class="h-px bg-white/10 flex-1"></div></div>
+<form id="loginForm">
+<label class="label" for="email">Email address</label><input id="email" class="inp" type="email" autocomplete="email" placeholder="name@example.com" required>
+<label class="label" for="password">Password</label><div class="relative"><input id="password" class="inp pr-16" type="password" autocomplete="current-password" placeholder="Enter password" required><button id="togglePass" type="button" class="absolute right-3 top-3.5 text-xs font-semibold text-[#a99cc7]">Show</button></div>
+<div class="text-right mt-3"><button id="forgotBtn" type="button" class="text-xs font-semibold text-[#b69aff]">Forgot password?</button></div>
+<button id="loginBtn" type="submit" class="btn primary mt-5">Sign In <span class="ml-1">→</span></button>
+</form>
+<div class="text-center mt-5 text-sm text-[#aaa4b5]">New here? <button id="signupBtn" class="font-bold text-[#b69aff]">Create account</button></div>
+<p id="message" class="message"></p>
+</section>
+<footer class="footer">© 2026 Kashi Mobile · Secure access</footer>
+</main>
+</div>
+
+<!-- MAIN -->
+<div id="mainScreen" class="app hidden">
+  <header class="relative z-10 flex items-center justify-between mb-5">
+    <div class="flex items-center gap-3">
+      <div class="w-11 h-11 rounded-2xl border border-purple-300/30 bg-gradient-to-br from-purple-500 to-violet-900 flex items-center justify-center text-2xl font-black shadow-lg shadow-purple-900/40">K</div>
+      <div><div class="font-extrabold tracking-tight text-lg">Kashi <span class="text-violet-400">Mobile</span></div><div class="text-[11px] text-slate-400">Repair Manager</div></div>
+    </div>
+    <button id="logoutBtn" class="text-xs text-slate-300 border border-white/10 rounded-xl px-3 py-2 bg-white/5">Logout ↗</button>
+  </header>
+
+  <section class="glass rounded-[24px] p-4 mb-3 relative z-10">
+    <div class="flex justify-between items-center gap-3">
+      <div>
+        <div class="text-xs text-slate-400 font-semibold">OUTSTANDING BALANCE</div>
+        <div id="balAmt" class="text-2xl font-extrabold mt-2">Rs 0</div>
+        <div id="balSub" class="text-xs text-violet-300 mt-1">0 active repairs</div>
+      </div>
+      <div class="w-16 h-16 rounded-2xl bg-violet-500/10 border border-violet-400/20 flex items-center justify-center text-3xl">◈</div>
+    </div>
+  </section>
+
+  <section class="grid grid-cols-3 gap-2.5 mb-4 relative z-10">
+    <div class="glass stat"><div class="text-[11px] text-slate-400">Total</div><div id="stTotal" class="text-xl font-extrabold mt-1">0</div><div class="text-[10px] text-violet-300 mt-1">All records</div></div>
+    <div class="glass stat"><div class="text-[11px] text-amber-400">Pending</div><div id="stPending" class="text-xl font-extrabold mt-1 text-amber-400">0</div><div class="text-[10px] text-slate-400 mt-1">In progress</div></div>
+    <div class="glass stat"><div class="text-[11px] text-emerald-400">Ready</div><div id="stReady" class="text-xl font-extrabold mt-1 text-emerald-400">0</div><div class="text-[10px] text-slate-400 mt-1">For pickup</div></div>
+  </section>
+
+  <div class="relative mb-3 z-10"><span class="absolute left-3.5 top-3 text-slate-400">⌕</span><input id="search" class="inp pl-9" placeholder="Search name, number or model..."></div>
+  <div id="tabs" class="flex gap-2 overflow-x-auto pb-4 relative z-10"></div>
+
+  <div class="flex items-center justify-between mb-3 relative z-10">
+    <h2 id="listTitle" class="font-extrabold text-lg">Recent Repairs</h2>
+    <button id="viewAll" class="text-xs font-bold text-violet-400">View all →</button>
+  </div>
+  <section id="list" class="space-y-3 relative z-10"></section>
+
+  <nav class="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[460px] glass border-t border-violet-300/15 rounded-t-3xl px-4 pt-3 pb-[max(12px,env(safe-area-inset-bottom))] flex justify-around items-center z-20">
+    <button id="navHome" class="text-center text-violet-400"><div class="text-lg">⌂</div><div class="text-[10px] font-bold">Home</div></button>
+    <button id="navRepairs" class="text-center text-slate-400"><div class="text-lg">🔧</div><div class="text-[10px]">Repairs</div></button>
+    <button id="addBtn" class="w-14 h-14 -mt-8 rounded-full border border-violet-300/40 bg-gradient-to-br from-violet-500 to-purple-800 shadow-lg shadow-violet-900/50 text-3xl font-light" aria-label="Nayi repair">+</button>
+    <button id="navReports" class="text-center text-slate-400"><div class="text-lg">▤</div><div class="text-[10px]">Reports</div></button>
+    <button id="navSettings" class="text-center text-slate-400"><div class="text-lg">⚙</div><div class="text-[10px]">Settings</div></button>
+  </nav>
+</div>
+
+<!-- FORM -->
+<div id="formScreen" class="overlay hidden">
+  <div class="pb-10">
+    <div class="topbar hdr sticky top-0 text-[#f5f3ff] border-b border-violet-300/15 px-4 pb-3 flex items-center gap-3 z-10">
+      <button id="formBack" class="pt-3 text-2xl leading-none">‹</button>
+      <div id="formTitle" class="pt-3 font-bold text-lg">Nayi Repair</div>
+    </div>
+    <div class="px-4">
+      <label class="lbl">Customer ka naam *</label>
+      <input id="fName" class="inp" autocomplete="off">
+      <label class="lbl">Contact number *</label>
+      <input id="fPhone" class="inp" type="tel" inputmode="tel" placeholder="03xx xxxxxxx">
+      <label class="lbl">Phone ka model *</label>
+      <input id="fModel" class="inp" placeholder="Jaise Samsung A12">
+      <label class="lbl">Phone ka masla *</label>
+      <textarea id="fProblem" class="inp" rows="2" placeholder="Jaise screen toot gayi"></textarea>
+
+      <label class="lbl">Accessories (jo saath diye)</label>
+      <div id="accChips" class="flex flex-wrap gap-2"></div>
+      <input id="fAccOther" class="inp mt-2" placeholder="Aur kuch (optional)">
+
+      <label class="lbl">Phone ka password / pattern</label>
+      <input id="fPass" class="inp" placeholder="Agar ho to likhein">
+
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="lbl">Advance (Rs)</label><input id="fAdvance" class="inp" type="number" inputmode="numeric" placeholder="0"></div>
+        <div><label class="lbl">Baqi (Rs)</label><input id="fBaqi" class="inp" type="number" inputmode="numeric" placeholder="0"></div>
+      </div>
+
+      <label class="lbl">Phone ki photo</label>
+      <div class="flex gap-2">
+        <button id="camBtn" type="button" class="btn flex-1 bg-[#17151c] border border-white/10 text-violet-400 !py-2.5">📷 Camera</button>
+        <button id="galBtn" type="button" class="btn flex-1 bg-[#17151c] border border-white/10 text-violet-400 !py-2.5">🖼️ Gallery</button>
+      </div>
+      <input id="camInput" type="file" accept="image/*" capture="environment" class="hidden">
+      <input id="galInput" type="file" accept="image/*" class="hidden">
+      <div id="photoBox" class="mt-3 hidden relative">
+        <img id="photoPrev" class="w-full rounded-xl border border-white/10 object-cover" style="max-height:240px">
+        <button id="photoDel" type="button" class="absolute top-2 right-2 bg-red-600 text-white text-xs font-bold rounded-lg px-3 py-1.5">Hatao</button>
+      </div>
+
+      <p id="formErr" class="text-sm text-red-400 mt-3"></p>
+      <button id="saveBtn" class="btn w-full mt-4 vbtn active:scale-95 transition">Save karein</button>
+    </div>
+  </div>
+</div>
+
+<!-- DETAIL -->
+<div id="detailScreen" class="overlay hidden">
+  <div class="pb-10">
+    <div class="topbar hdr sticky top-0 text-[#f5f3ff] border-b border-violet-300/15 px-4 pb-3 flex items-center gap-3 z-10">
+      <button id="detBack" class="pt-3 text-2xl leading-none">‹</button>
+      <div class="pt-3 font-bold text-lg">Repair ki detail</div>
+    </div>
+    <div id="detBody" class="px-4 pt-4"></div>
+  </div>
+</div>
+
+<!-- REPORTS -->
+<div id="reportScreen" class="overlay hidden">
+  <div class="pb-10">
+    <div class="topbar hdr sticky top-0 text-[#f5f3ff] border-b border-violet-300/15 px-4 pb-3 flex items-center gap-3 z-10">
+      <button id="repBack" class="pt-3 text-2xl leading-none">‹</button>
+      <div class="pt-3 font-bold text-lg">Reports</div>
+    </div>
+    <div id="repBody" class="px-4 pt-4"></div>
+  </div>
+</div>
+
+<!-- SETTINGS -->
+<div id="settingsScreen" class="overlay hidden">
+  <div class="pb-10">
+    <div class="topbar hdr sticky top-0 text-[#f5f3ff] border-b border-violet-300/15 px-4 pb-3 flex items-center gap-3 z-10">
+      <button id="setBack" class="pt-3 text-2xl leading-none">‹</button>
+      <div class="pt-3 font-bold text-lg">Settings</div>
+    </div>
+    <div class="px-4 pt-4">
+      <div class="glass rounded-2xl p-4">
+        <div class="text-xs text-slate-400 font-semibold">LOGIN ACCOUNT</div>
+        <div id="setEmail" class="mt-2 font-bold break-all"></div>
+        <p class="text-xs text-slate-400 mt-3">Aap ki sari repairs sirf isi account mein save hoti hain. Naye phone par isi account se login karein to sab wapis aa jayega.</p>
+      </div>
+      <button id="setLogout" class="btn w-full mt-5 bg-transparent border border-red-500/60 text-red-400">Logout</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="fixed left-1/2 -translate-x-1/2 bottom-24 z-50 bg-[#1b1626] text-violet-200 border border-violet-300/20 text-sm font-semibold rounded-full px-4 py-2 hidden"></div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, onAuthStateChanged, signOut }
+  from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager,
+  collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot, query, orderBy }
+  from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBTyFq8bam3ZuTdshnU5ewDmjriiuWLO8Y",
+  authDomain: "super-store-ef2f1.firebaseapp.com",
+  projectId: "super-store-ef2f1",
+  storageBucket: "super-store-ef2f1.firebasestorage.app",
+  messagingSenderId: "83672930416",
+  appId: "1:83672930416:web:97363dd61e512f434d7cb5"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+let db;
+try {
+  db = initializeFirestore(app, { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) });
+} catch (e) { db = getFirestore(app); }
+const provider = new GoogleAuthProvider();
+
+const $ = id => document.getElementById(id);
+const STATUSES = ["Pending", "Ready", "Diya Gaya"];
+const stClass = s => s === "Pending" ? "st-Pending" : s === "Ready" ? "st-Ready" : "st-Diya";
+const ACCESSORIES = ["SIM", "Cover", "Memory Card", "Battery", "Charger"];
+
+let user = null, unsub = null, repairs = [], filter = "Sab", editingId = null, photo = null, accSel = new Set(), openId = null;
+
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const money = n => "Rs " + (Number(n) || 0).toLocaleString("en-PK");
+const fmtDate = t => t ? new Date(t).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "";
+
+function toast(msg) {
+  const t = $("toast"); t.textContent = msg; t.classList.remove("hidden");
+  clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.add("hidden"), 2200);
+}
+function show(id) { ["loginScreen", "mainScreen"].forEach(x => $(x).classList.toggle("hidden", x !== id)); }
+
+/* ---------- LOGIN ---------- */
+let signupMode = false;
+function msg(t, good = false) { $("message").textContent = t; $("message").style.color = good ? "#6ee7b7" : "#fda4af"; }
+function friendly(e) {
+  const c = e?.code || "";
+  return ({
+    "auth/invalid-email": "Email address is invalid.",
+    "auth/user-not-found": "Account not found. Create an account first.",
+    "auth/wrong-password": "Incorrect password.",
+    "auth/invalid-credential": "Email or password is incorrect.",
+    "auth/email-already-in-use": "This email is already registered. Sign in instead.",
+    "auth/weak-password": "Password must be at least 6 characters.",
+    "auth/popup-closed-by-user": "Google sign-in was cancelled.",
+    "auth/popup-blocked": "Popup blocked. Allow popups for this site in Chrome, then try again.",
+    "auth/unauthorized-domain": "This website is not authorized in Firebase (Authentication > Settings > Authorized domains).",
+    "auth/operation-not-allowed": "This sign-in method is not enabled in Firebase Authentication yet.",
+    "auth/operation-not-supported-in-this-environment": "This browser is not supported. Open the link directly in Chrome.",
+    "auth/network-request-failed": "Network problem. Check your internet.",
+    "auth/too-many-requests": "Too many attempts. Try again later."
+  })[c] || "Something went wrong: " + c;
+}
+const loginBtnHTML = () => signupMode ? "Create Account" : "Sign In <span class='ml-1'>→</span>";
+$("togglePass").onclick = () => { const p = $("password"); p.type = p.type === "password" ? "text" : "password"; $("togglePass").textContent = p.type === "password" ? "Show" : "Hide"; };
+$("signupBtn").onclick = () => {
+  signupMode = !signupMode;
+  $("loginBtn").innerHTML = loginBtnHTML();
+  $("signupBtn").textContent = signupMode ? "Sign in instead" : "Create account";
+  $("password").autocomplete = signupMode ? "new-password" : "current-password";
+  msg(signupMode ? "Create your account with email and password." : "");
+};
+$("loginForm").onsubmit = async e => {
+  e.preventDefault(); msg("");
+  $("loginBtn").disabled = true; $("loginBtn").textContent = signupMode ? "Creating..." : "Signing in...";
+  try {
+    const email = $("email").value.trim(), pass = $("password").value;
+    if (signupMode) await createUserWithEmailAndPassword(auth, email, pass);
+    else await signInWithEmailAndPassword(auth, email, pass);
+  } catch (err) { msg(friendly(err)); }
+  finally { $("loginBtn").disabled = false; $("loginBtn").innerHTML = loginBtnHTML(); }
+};
+$("googleBtn").onclick = async () => {
+  msg("");
+  try { await signInWithPopup(auth, provider); }
+  catch (err) { if (err.code !== "auth/cancelled-popup-request") msg(friendly(err)); }
+};
+$("forgotBtn").onclick = async () => {
+  const email = $("email").value.trim();
+  if (!email) { msg("Enter your email address first."); $("email").focus(); return; }
+  try { await sendPasswordResetEmail(auth, email); msg("Password reset email sent. Check your inbox.", true); }
+  catch (err) { msg(friendly(err)); }
+};
+
+$("logoutBtn").onclick = () => { if (confirm("Logout karna hai?")) signOut(auth); };
+
+onAuthStateChanged(auth, u => {
+  user = u;
+  if (unsub) { unsub(); unsub = null; }
+  if (!u) { repairs = []; closeAll(); $("password").value = ""; show("loginScreen"); return; }
+  show("mainScreen");
+  const q = query(collection(db, "users", u.uid, "repairs"), orderBy("createdAt", "desc"));
+  unsub = onSnapshot(q, snap => {
+    repairs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderList();
+    if (openId) renderDetail();
+  }, err => toast("Data load nahi hua: " + err.code));
+});
+
+/* ---------- LIST ---------- */
+let showAll = false;
+function renderList() {
+  const act = repairs.filter(r => r.status !== "Diya Gaya");
+  const owed = act.reduce((a, r) => a + (Number(r.baqi) || 0), 0);
+  $("balAmt").textContent = money(owed);
+  $("balSub").textContent = act.length + " active repair" + (act.length === 1 ? "" : "s");
+  const cnt = s => repairs.filter(r => r.status === s).length;
+  $("stTotal").textContent = repairs.length;
+  $("stPending").textContent = cnt("Pending");
+  $("stReady").textContent = cnt("Ready");
+
+  $("tabs").innerHTML = ["Sab", ...STATUSES].map(s => {
+    const n = s === "Sab" ? repairs.length : cnt(s);
+    return `<button data-f="${s}" class="chip ${filter === s ? "on" : ""}">${s === "Sab" ? "All" : s} (${n})</button>`;
+  }).join("");
+
+  const term = $("search").value.trim().toLowerCase();
+  const rows = repairs.filter(r =>
+    (filter === "Sab" || r.status === filter) &&
+    (!term || [r.name, r.phone, r.model, r.problem].some(x => String(x || "").toLowerCase().includes(term))));
+
+  const plain = filter === "Sab" && !term;
+  const shown = plain && !showAll ? rows.slice(0, 10) : rows;
+  $("listTitle").textContent = plain ? "Recent Repairs" : "Repairs";
+  $("viewAll").classList.toggle("hidden", !(plain && rows.length > 10));
+  $("viewAll").textContent = showAll ? "Show less" : "View all →";
+
+  if (!shown.length) {
+    $("list").innerHTML = `<div class="text-center text-slate-400 text-sm py-16">${repairs.length ? "Koi repair nahi mili." : "Abhi koi repair nahi. Neeche + dabayein."}</div>`;
+    return;
+  }
+  $("list").innerHTML = shown.map(r => {
+    const owes = Number(r.baqi) > 0 && r.status !== "Diya Gaya";
+    const thumb = r.photo
+      ? `<img src="${r.photo}" class="w-16 h-16 rounded-2xl object-cover border border-violet-300/15 flex-shrink-0">`
+      : `<div class="w-16 h-16 rounded-2xl bg-violet-500/15 border border-violet-300/15 flex-shrink-0 flex items-center justify-center text-2xl">📱</div>`;
+    return `
+    <article data-id="${r.id}" class="glass repair">
+      ${thumb}
+      <div class="min-w-0 flex-1">
+        <div class="flex items-center justify-between gap-2"><div class="font-bold truncate">${esc(r.name)}</div><span class="badge ${stClass(r.status)}">${esc(r.status)}</span></div>
+        <div class="text-xs text-slate-400 mt-1 truncate">${esc(r.model)} · ${esc(r.problem)}</div>
+        <div class="flex justify-between gap-2 text-[10px] text-slate-500 mt-2"><span>${fmtDate(r.createdAt)}</span>${owes ? `<span class="font-bold text-amber-400">Baqi ${money(r.baqi)}</span>` : `<span class="font-bold text-emerald-400">Paid ✓</span>`}</div>
+      </div>
+      <div class="self-center text-slate-500">›</div>
+    </article>`;
+  }).join("");
+}
+$("tabs").onclick = e => { const b = e.target.closest("[data-f]"); if (b) { filter = b.dataset.f; showAll = false; renderList(); } };
+$("search").oninput = renderList;
+$("viewAll").onclick = () => { showAll = !showAll; renderList(); };
+$("list").onclick = e => { const c = e.target.closest("[data-id]"); if (c) openDetail(c.dataset.id); };
+
+/* ---------- BOTTOM NAV, REPORTS, SETTINGS ---------- */
+function setNav(t) {
+  ["Home", "Repairs"].forEach(n => {
+    const b = $("nav" + n), on = n.toLowerCase() === t;
+    b.classList.toggle("text-violet-400", on); b.classList.toggle("text-slate-400", !on);
+    b.lastElementChild.classList.toggle("font-bold", on);
+  });
+}
+$("navHome").onclick = () => { filter = "Sab"; showAll = false; $("search").value = ""; renderList(); window.scrollTo({ top: 0, behavior: "smooth" }); setNav("home"); };
+$("navRepairs").onclick = () => { $("listTitle").scrollIntoView({ behavior: "smooth", block: "start" }); setNav("repairs"); };
+
+function renderReports() {
+  const cnt = s => repairs.filter(r => r.status === s).length;
+  const owed = repairs.filter(r => r.status !== "Diya Gaya").reduce((a, r) => a + (Number(r.baqi) || 0), 0);
+  const adv = repairs.reduce((a, r) => a + (Number(r.advance) || 0), 0);
+  const box = (label, val, cls = "") => `<div class="glass rounded-2xl p-4"><div class="text-[11px] text-slate-400 font-semibold">${label}</div><div class="text-xl font-extrabold mt-1 ${cls}">${val}</div></div>`;
+  $("repBody").innerHTML = `<div class="grid grid-cols-2 gap-3">
+    ${box("Total repairs", repairs.length)}
+    ${box("Pending", cnt("Pending"), "text-amber-400")}
+    ${box("Ready", cnt("Ready"), "text-emerald-400")}
+    ${box("Diya Gaya", cnt("Diya Gaya"), "text-violet-300")}
+    ${box("Baqi wasooli", money(owed), "text-amber-400")}
+    ${box("Advance mila", money(adv), "text-emerald-400")}
+  </div>`;
+}
+$("navReports").onclick = () => { renderReports(); $("reportScreen").classList.remove("hidden"); $("reportScreen").scrollTop = 0; };
+$("repBack").onclick = () => $("reportScreen").classList.add("hidden");
+$("navSettings").onclick = () => { $("setEmail").textContent = user?.email || ""; $("settingsScreen").classList.remove("hidden"); $("settingsScreen").scrollTop = 0; };
+$("setBack").onclick = () => $("settingsScreen").classList.add("hidden");
+$("setLogout").onclick = () => $("logoutBtn").onclick();
+
+/* ---------- DETAIL ---------- */
+function openDetail(id) { openId = id; renderDetail(); $("detailScreen").classList.remove("hidden"); $("detailScreen").scrollTop = 0; }
+function renderDetail() {
+  const r = repairs.find(x => x.id === openId);
+  if (!r) { $("detailScreen").classList.add("hidden"); openId = null; return; }
+  const row = (k, v) => v ? `<div class="py-2.5 border-b border-white/10"><div class="text-xs text-slate-400 font-semibold">${k}</div><div class="text-[15px] text-[#f5f3ff] whitespace-pre-wrap break-words">${v}</div></div>` : "";
+  $("detBody").innerHTML = `
+    ${r.photo ? `<img src="${r.photo}" class="w-full rounded-2xl border border-white/10 mb-3 object-cover" style="max-height:280px">` : ""}
+    <div class="flex items-center justify-between">
+      <div class="text-xl font-extrabold text-[#f5f3ff]">${esc(r.name)}</div>
+      <span class="badge ${stClass(r.status)}">${esc(r.status)}</span>
+    </div>
+    <div class="grid grid-cols-3 gap-2 mt-3" id="stBtns">
+      ${STATUSES.map(s => `<button data-s="${s}" class="chip ${r.status === s ? "on" : ""} !rounded-xl !py-2.5">${s}</button>`).join("")}
+    </div>
+    <p class="text-[11.5px] text-slate-400 mt-1">"Diya Gaya" dabane par Baqi khud 0 ho jata hai.</p>
+    <div class="mt-3 glass rounded-2xl px-4">
+      ${row("Contact number", `<a class="text-violet-400 font-bold underline" href="tel:${esc(r.phone)}">${esc(r.phone)}</a>`)}
+      ${row("Phone ka model", esc(r.model))}
+      ${row("Masla", esc(r.problem))}
+      ${row("Accessories", esc((r.accessories || []).join(", ")))}
+      ${row("Password / Pattern", esc(r.password))}
+      ${row("Advance", money(r.advance))}
+      ${row("Baqi", `<span class="font-bold ${Number(r.baqi) > 0 ? "text-amber-400" : ""}">${money(r.baqi)}</span>`)}
+      ${row("Date", fmtDate(r.createdAt))}
+    </div>
+    <div class="grid grid-cols-2 gap-3 mt-5">
+      <button id="editBtn" class="btn vbtn">Edit</button>
+      <button id="delBtn" class="btn bg-transparent border border-red-500/60 text-red-400">Delete</button>
+    </div>`;
+}
+$("detBack").onclick = () => { $("detailScreen").classList.add("hidden"); openId = null; };
+$("detBody").onclick = async e => {
+  const r = repairs.find(x => x.id === openId); if (!r) return;
+  const sb = e.target.closest("[data-s]");
+  if (sb) {
+    const s = sb.dataset.s; if (s === r.status) return;
+    const upd = { status: s }; if (s === "Diya Gaya") upd.baqi = 0;
+    try { await updateDoc(doc(db, "users", user.uid, "repairs", r.id), upd); toast("Status: " + s); }
+    catch (err) { toast("Save nahi hua: " + err.code); }
+    return;
+  }
+  if (e.target.closest("#editBtn")) openForm(r);
+  if (e.target.closest("#delBtn")) {
+    if (confirm(r.name + " ki repair delete kar dein? Ye wapis nahi aayegi.")) {
+      try { await deleteDoc(doc(db, "users", user.uid, "repairs", r.id)); $("detailScreen").classList.add("hidden"); openId = null; toast("Delete ho gayi"); }
+      catch (err) { toast("Delete nahi hua: " + err.code); }
+    }
+  }
+};
+
+/* ---------- FORM ---------- */
+function renderAcc() {
+  $("accChips").innerHTML = ACCESSORIES.map(a => `<button type="button" data-a="${a}" class="chip ${accSel.has(a) ? "on" : ""}">${a}</button>`).join("");
+}
+$("accChips").onclick = e => { const b = e.target.closest("[data-a]"); if (!b) return; accSel.has(b.dataset.a) ? accSel.delete(b.dataset.a) : accSel.add(b.dataset.a); renderAcc(); };
+
+function setPhoto(p) {
+  photo = p;
+  $("photoBox").classList.toggle("hidden", !p);
+  if (p) $("photoPrev").src = p;
+}
+function openForm(r) {
+  editingId = r ? r.id : null;
+  $("formTitle").textContent = r ? "Repair edit karein" : "Nayi Repair";
+  $("fName").value = r?.name || ""; $("fPhone").value = r?.phone || "";
+  $("fModel").value = r?.model || ""; $("fProblem").value = r?.problem || "";
+  $("fPass").value = r?.password || "";
+  $("fAdvance").value = r?.advance ?? ""; $("fBaqi").value = r?.baqi ?? "";
+  const known = (r?.accessories || []).filter(a => ACCESSORIES.includes(a));
+  accSel = new Set(known);
+  $("fAccOther").value = (r?.accessories || []).filter(a => !ACCESSORIES.includes(a)).join(", ");
+  renderAcc(); setPhoto(r?.photo || null);
+  $("formErr").textContent = ""; $("saveBtn").disabled = false; $("saveBtn").textContent = "Save karein";
+  $("formScreen").classList.remove("hidden"); $("formScreen").scrollTop = 0;
+}
+$("addBtn").onclick = () => openForm(null);
+$("formBack").onclick = () => $("formScreen").classList.add("hidden");
+
+$("camBtn").onclick = () => $("camInput").click();
+$("galBtn").onclick = () => $("galInput").click();
+$("photoDel").onclick = () => setPhoto(null);
+async function onFile(e) {
+  const f = e.target.files[0]; e.target.value = ""; if (!f) return;
+  try { setPhoto(await compress(f)); } catch (err) { $("formErr").textContent = "Photo load nahi hui, dobara koshish karein."; }
+}
+$("camInput").onchange = onFile; $("galInput").onchange = onFile;
+
+function compress(file) {
+  return new Promise((res, rej) => {
+    const img = new Image(), url = URL.createObjectURL(file);
+    img.onload = () => {
+      const max = 720, s = Math.min(1, max / Math.max(img.width, img.height));
+      const c = document.createElement("canvas");
+      c.width = Math.round(img.width * s); c.height = Math.round(img.height * s);
+      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url); res(c.toDataURL("image/jpeg", 0.6));
+    };
+    img.onerror = () => rej(new Error("img"));
+    img.src = url;
+  });
+}
+
+$("saveBtn").onclick = async () => {
+  const name = $("fName").value.trim(), phone = $("fPhone").value.trim(),
+        model = $("fModel").value.trim(), problem = $("fProblem").value.trim();
+  if (!name || !phone || !model || !problem) { $("formErr").textContent = "Naam, number, model aur masla zaroor likhein."; return; }
+  const other = $("fAccOther").value.split(",").map(x => x.trim()).filter(Boolean);
+  const data = {
+    name, phone, model, problem,
+    accessories: [...accSel, ...other],
+    password: $("fPass").value.trim(),
+    advance: Number($("fAdvance").value) || 0,
+    baqi: Number($("fBaqi").value) || 0,
+    photo: photo || null
+  };
+  $("saveBtn").disabled = true; $("saveBtn").textContent = "Save ho raha hai...";
+  try {
+    if (editingId) {
+      const cur = repairs.find(x => x.id === editingId);
+      if (cur?.status === "Diya Gaya") data.baqi = 0;
+      await updateDoc(doc(db, "users", user.uid, "repairs", editingId), data);
+    } else {
+      await addDoc(collection(db, "users", user.uid, "repairs"), { ...data, status: "Pending", createdAt: Date.now() });
+    }
+    $("formScreen").classList.add("hidden"); toast("Save ho gayi");
+  } catch (err) {
+    $("formErr").textContent = "Save nahi hua: " + err.code;
+    $("saveBtn").disabled = false; $("saveBtn").textContent = "Save karein";
+  }
+};
+
+function closeAll() { ["formScreen", "detailScreen", "reportScreen", "settingsScreen"].forEach(x => $(x).classList.add("hidden")); openId = null; }
+</script>
+</body>
+</html>
